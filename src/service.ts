@@ -174,9 +174,21 @@ export class MusicLinkParser {
     if (!match) throw new Error(m.error_invalid_apple_url())
 
     const albumId = match[1]
-    // 直接请求，无需代理（iTunes API 支持 CORS）
-    const res = await fetch(`https://itunes.apple.com/lookup?id=${albumId}&entity=song`)
-    const data = await res.json()
+    // // 直接请求，无需代理（iTunes API 支持 CORS）
+    // const res = await fetch(`https://itunes.apple.com/lookup?id=${albumId}&entity=song`)
+    // const data = await res.json()
+    // const results = Array.isArray(data?.results) ? data.results : []
+    // if (results.length === 0) {
+    //   throw new Error(m.error_parse_failed())
+    // }
+
+    const embedUrl = `https://itunes.apple.com/lookup?id=${albumId}&entity=song`
+
+    // 通过代理获取 json
+    const response = await fetch(`${this.PROXY}${encodeURIComponent(embedUrl)}`)
+    if (!response.ok) throw new Error(m.error_parse_failed())
+
+    const data = await response.json()
     const results = Array.isArray(data?.results) ? data.results : []
     if (results.length === 0) {
       throw new Error(m.error_parse_failed())
