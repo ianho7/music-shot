@@ -29,7 +29,7 @@
   "label_align_center": "居中",
   "label_align_right": "右对齐",
   "label_generating": "生成中...",
-  "label_generate_download": "生成图片并下载",
+  "label_generate_download": "生成图片",
   "input_subtitle": "粘贴专辑链接，快速生成高质感音乐分享图。",
   "input_placeholder": "请输入 Apple Music 或 Spotify 专辑链接",
   "input_parsing": "解析中...",

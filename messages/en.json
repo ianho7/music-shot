@@ -29,7 +29,7 @@
   "label_align_center": "Center",
   "label_align_right": "Right",
   "label_generating": "Generating...",
-  "label_generate_download": "Generate & Download",
+  "label_generate_download": "Generate",
   "input_subtitle": "Paste an album link to quickly create a polished music share image.",
   "input_placeholder": "Enter Apple Music or Spotify album link",
   "input_parsing": "Parsing...",

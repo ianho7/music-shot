@@ -37,12 +37,16 @@ const STORAGE_CREDIT_NAME_KEY = 'music-shot:credit-name'
 const STORAGE_AVATAR_URL_KEY = 'music-shot:avatar-url'
 const STORAGE_SHOW_CREDIT_KEY = 'music-shot:show-credit'
 const STORAGE_LOCALE_KEY = 'music-shot:locale'
+const STORAGE_BLUR_LEVEL_KEY = 'music-shot:blur-level'
+const STORAGE_EXPORT_RATIO_KEY = 'music-shot:export-ratio'
+const STORAGE_FRAME_THEME_KEY = 'music-shot:frame-theme'
+const STORAGE_TITLE_ALIGN_KEY = 'music-shot:title-align'
 const STORAGE_DEBUG_PREFIX = '[credit-storage]'
 const GITHUB_REPO_URL = 'https://github.com/ianho7/music-shot'
 let snapdomLib: typeof import('@zumer/snapdom') | null = null
 const locale = ref<'en' | 'zh'>('en')
 
-const EXPORT_FRAME_HEIGHT_RATIO = 0.95
+const EXPORT_FRAME_HEIGHT_RATIO = 0.90
 const EXPORT_SIZE: Record<ExportRatio, { width: number; height: number }> = {
   '3:4': { width: 2400, height: 3200 },
   '9:16': { width: 1620, height: 2880 },
@@ -248,23 +252,54 @@ function setStorageItemWithLog(key: string, value: string) {
   }
 }
 
+function parseSavedBlurLevel(raw: string | null): number {
+  if (!raw) return 20
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed)) return 20
+  return Math.min(40, Math.max(0, Math.round(parsed)))
+}
+
+function parseSavedExportRatio(raw: string | null): ExportRatio {
+  return raw === '3:4' || raw === '9:16' ? raw : '3:4'
+}
+
+function parseSavedFrameTheme(raw: string | null): FrameTheme {
+  return raw === 'dark' || raw === 'light' ? raw : 'dark'
+}
+
+function parseSavedTitleAlign(raw: string | null): TextAlignMode {
+  return raw === 'left' || raw === 'center' || raw === 'right' ? raw : 'center'
+}
+
 onMounted(() => {
   initLocale()
   try {
     const savedName = localStorage.getItem(STORAGE_CREDIT_NAME_KEY)
     const savedAvatar = localStorage.getItem(STORAGE_AVATAR_URL_KEY)
     const savedShowCredit = localStorage.getItem(STORAGE_SHOW_CREDIT_KEY)
+    const savedBlurLevel = localStorage.getItem(STORAGE_BLUR_LEVEL_KEY)
+    const savedExportRatio = localStorage.getItem(STORAGE_EXPORT_RATIO_KEY)
+    const savedFrameTheme = localStorage.getItem(STORAGE_FRAME_THEME_KEY)
+    const savedTitleAlign = localStorage.getItem(STORAGE_TITLE_ALIGN_KEY)
     if (savedName) creditName.value = savedName
     if (savedAvatar) avatarUrl.value = savedAvatar
     if (savedShowCredit === 'true' || savedShowCredit === 'false') {
       showCredit.value = savedShowCredit === 'true'
     }
+    blurLevel.value = parseSavedBlurLevel(savedBlurLevel)
+    exportRatio.value = parseSavedExportRatio(savedExportRatio)
+    frameTheme.value = parseSavedFrameTheme(savedFrameTheme)
+    titleAlign.value = parseSavedTitleAlign(savedTitleAlign)
     console.log(`${STORAGE_DEBUG_PREFIX} mounted-read`, {
       hasName: !!savedName,
       nameLength: savedName?.length ?? 0,
       hasAvatar: !!savedAvatar,
       avatarLength: savedAvatar?.length ?? 0,
       showCredit: savedShowCredit,
+      blurLevel: blurLevel.value,
+      exportRatio: exportRatio.value,
+      frameTheme: frameTheme.value,
+      titleAlign: titleAlign.value,
       totalBytes: estimateStorageBytes(),
     })
   } catch {
@@ -282,6 +317,22 @@ watch(avatarUrl, (value) => {
 
 watch(showCredit, (value) => {
   setStorageItemWithLog(STORAGE_SHOW_CREDIT_KEY, String(value))
+})
+
+watch(blurLevel, (value) => {
+  setStorageItemWithLog(STORAGE_BLUR_LEVEL_KEY, String(value))
+})
+
+watch(exportRatio, (value) => {
+  setStorageItemWithLog(STORAGE_EXPORT_RATIO_KEY, value)
+})
+
+watch(frameTheme, (value) => {
+  setStorageItemWithLog(STORAGE_FRAME_THEME_KEY, value)
+})
+
+watch(titleAlign, (value) => {
+  setStorageItemWithLog(STORAGE_TITLE_ALIGN_KEY, value)
 })
 
 watch(viewState, (value) => {
@@ -306,12 +357,19 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => resolve())
+  })
+}
+
 async function drawExportCredit(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
   name: string,
   avatarSrc: string,
+  imageCache?: Map<string, HTMLImageElement>,
 ) {
   const text = name.trim()
   if (!text) return
@@ -350,13 +408,32 @@ async function drawExportCredit(
   const textBaselineY = y + Math.round((contentHeight - textInkHeight) / 2) + textAscent
 
   if (hasAvatar) {
-    const avatar = await loadImage(avatarSrc)
+    let avatar = imageCache?.get(avatarSrc)
+    if (!avatar) {
+      avatar = await loadImage(avatarSrc)
+      imageCache?.set(avatarSrc, avatar)
+    }
     const avatarY = Math.round(y + (contentHeight - avatarSize) / 2)
+    const sourceWidth = Math.max(1, avatar.naturalWidth || avatar.width)
+    const sourceHeight = Math.max(1, avatar.naturalHeight || avatar.height)
+    const sourceSide = Math.min(sourceWidth, sourceHeight)
+    const sourceX = Math.round((sourceWidth - sourceSide) / 2)
+    const sourceY = Math.round((sourceHeight - sourceSide) / 2)
     ctx.save()
     ctx.beginPath()
     ctx.arc(x + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2)
     ctx.clip()
-    ctx.drawImage(avatar, x, avatarY, avatarSize, avatarSize)
+    ctx.drawImage(
+      avatar,
+      sourceX,
+      sourceY,
+      sourceSide,
+      sourceSide,
+      x,
+      avatarY,
+      avatarSize,
+      avatarSize,
+    )
     ctx.restore()
   }
 
@@ -385,6 +462,12 @@ async function generateAndDownloadImage() {
   exporting.value = true
   exportError.value = ''
   exportRenderMode.value = true
+  const perfStart = performance.now()
+  const stepDurations: Record<string, number> = {}
+  const markStep = (name: string, start: number) => {
+    stepDurations[name] = Number((performance.now() - start).toFixed(1))
+  }
+  const imageCache = new Map<string, HTMLImageElement>()
 
   try {
     await nextTick()
@@ -400,25 +483,15 @@ async function generateAndDownloadImage() {
     canvas.height = height
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error(m.error_canvas_context_failed())
+    const loadCoverStart = performance.now()
+    let cover = imageCache.get(coverUrl.value)
+    if (!cover) {
+      cover = await loadImage(coverUrl.value)
+      imageCache.set(coverUrl.value, cover)
+    }
+    markStep('loadCover', loadCoverStart)
 
-    console.group('[export-image]')
-    console.log('ratio:', exportRatio.value)
-    console.log('canvas:', { width, height })
-    console.log('frameRect:', {
-      width: frameRect.width,
-      height: frameRect.height,
-      left: frameRect.left,
-      top: frameRect.top,
-    })
-    console.log('resultRect:', {
-      width: resultRect.width,
-      height: resultRect.height,
-      left: resultRect.left,
-      top: resultRect.top,
-    })
-    console.log('blurLevel:', blurLevel.value)
-
-    const cover = await loadImage(coverUrl.value)
+    const drawBgStart = performance.now()
     const scale = Math.max(width / cover.width, height / cover.height)
     const drawW = cover.width * scale
     const drawH = cover.height * scale
@@ -432,47 +505,58 @@ async function generateAndDownloadImage() {
 
     ctx.fillStyle = 'rgba(14, 14, 14, 0.35)'
     ctx.fillRect(0, 0, width, height)
+    markStep('drawBg', drawBgStart)
 
     const desiredInnerHeight = Math.round(height * EXPORT_FRAME_HEIGHT_RATIO)
     // Determine capture scale by target height, then draw 1:1 with captured pixels (no secondary stretch).
     const captureScale = desiredInnerHeight / frameRect.height
-    console.log('captureScale:', captureScale)
 
     const previousScrollTop = resultScreenRef.value.scrollTop
     resultScreenRef.value.scrollTop = 0
     await nextTick()
 
     const snapdom = await getSnapdom()
-    const frameShot = await snapdom.toCanvas(phoneFrameRef.value, {
-      backgroundColor: 'transparent',
-      scale: captureScale,
-      dpr: 1,
-      width: Math.round(frameRect.width),
-      height: Math.round(frameRect.height),
-      embedFonts: true,
-      iconFonts: [/Material Symbols/i],
-      // useProxy: 'https://music-shot-proxy.0v0.one/?url=',
-    })
-    resultScreenRef.value.scrollTop = previousScrollTop
-    console.log('frameShot:', { width: frameShot.width, height: frameShot.height })
-    console.log('targetVsShotDelta:', {
-      widthDelta: Math.round(desiredInnerHeight * frameAspect) - frameShot.width,
-      heightDelta: desiredInnerHeight - frameShot.height,
-    })
+    const snapdomStart = performance.now()
+    let frameShot: HTMLCanvasElement
+    try {
+      frameShot = await snapdom.toCanvas(phoneFrameRef.value, {
+        backgroundColor: 'transparent',
+        scale: captureScale,
+        dpr: 1,
+        width: Math.round(frameRect.width),
+        height: Math.round(frameRect.height),
+        embedFonts: true,
+        iconFonts: [/Material Symbols/i],
+      })
+    } finally {
+      resultScreenRef.value.scrollTop = previousScrollTop
+    }
+    markStep('snapdomCapture', snapdomStart)
 
     // Draw captured phone frame as-is to keep page layering behavior.
+    const drawFrameStart = performance.now()
     const frameWidth = frameShot.width
     const frameHeight = frameShot.height
     const frameX = Math.round((width - frameWidth) / 2)
     const frameY = Math.round((height - frameHeight) / 2)
-    console.log('drawFrame:', { frameWidth, frameHeight, frameX, frameY })
     ctx.drawImage(frameShot, frameX, frameY, frameWidth, frameHeight)
-    if (showCredit.value) {
-      await drawExportCredit(ctx, width, height, creditName.value, avatarUrl.value)
-    }
+    markStep('drawFrame', drawFrameStart)
 
+    const drawCreditStart = performance.now()
+    if (showCredit.value) {
+      await drawExportCredit(ctx, width, height, creditName.value, avatarUrl.value, imageCache)
+    }
+    markStep('drawCredit', drawCreditStart)
+    frameShot.width = 0
+    frameShot.height = 0
+    imageCache.clear()
+
+    const encodeStart = performance.now()
     const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png', 1))
     if (!blob) throw new Error(m.error_image_generate_failed())
+    markStep('encodePng', encodeStart)
+
+    await nextFrame()
 
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -480,11 +564,25 @@ async function generateAndDownloadImage() {
     link.download = getExportFileName()
     link.click()
     URL.revokeObjectURL(url)
+    if (import.meta.env.DEV) {
+      const total = Number((performance.now() - perfStart).toFixed(1))
+      console.groupCollapsed('[export-image] perf')
+      console.log('params:', {
+        ratio: exportRatio.value,
+        width,
+        height,
+        frameRect: { width: frameRect.width, height: frameRect.height },
+        resultRect: { width: resultRect.width, height: resultRect.height },
+        captureScale: Number(captureScale.toFixed(3)),
+        blurLevel: blurLevel.value,
+      })
+      console.table({ ...stepDurations, total })
+      console.groupEnd()
+    }
   } catch (err) {
     exportError.value = (err as Error).message || m.error_export_failed()
     console.error('[export-image] failed:', err)
   } finally {
-    console.groupEnd()
     exportRenderMode.value = false
     exporting.value = false
   }
@@ -756,7 +854,7 @@ const resultTitleClass = computed(() =>
               accept="image/*"
               @change="handleAvatarUpload"
             />
-            <img v-show="avatarUrl" :src="avatarUrl" alt="" class="w-8 h-8 rounded-lg" />
+            <img v-show="avatarUrl" :src="avatarUrl" alt="" class="w-8 h-8 rounded-lg object-cover" />
             <button
               type="button"
               class="w-[30%] h-8 ml-auto rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-white/20 disabled:opacity-50"
@@ -797,17 +895,17 @@ const resultTitleClass = computed(() =>
     ></div>
     <div
       v-if="viewState === 'result' && albumData && isMobilePanelOpen"
-      class="fixed inset-x-0 bottom-0 z-[70] max-h-[78dvh] overflow-hidden rounded-t-2xl border-t border-white/15 bg-black/78 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur-xl md:hidden"
+      class="fixed inset-x-0 bottom-0 z-[70] overflow-hidden rounded-t-2xl border-t border-white/15 bg-black/78 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-4 backdrop-blur-xl md:hidden"
     >
       <div class="mb-3 flex items-center justify-between gap-2">
         <button
           type="button"
-          class="flex h-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+          class="flex h-8 items-center justify-center rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/20"
           @click="closeMobilePanel"
         >
           {{ m.label_close() }}
         </button>
-        <div class="grid grid-cols-2 gap-1 rounded-lg bg-white/10 p-1">
+        <div class="grid grid-cols-2 rounded-lg bg-white/10">
           <button
             type="button"
             class="rounded-lg px-2 py-1 text-xs font-semibold text-white transition-colors"
@@ -826,10 +924,10 @@ const resultTitleClass = computed(() =>
           </button>
         </div>
       </div>
-      <div class="max-h-[calc(78dvh-3.75rem)] overflow-y-auto pr-1">
+      <div class="max-h-[calc(78dvh-3.75rem)] overflow-y-auto pr-1 flex flex-col gap-3">
         <button
           type="button"
-          class="mb-3 flex w-full items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          class="flex w-full h-8 items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           :aria-label="m.github_button_aria_label()"
           @click="openGithubRepo"
         >
@@ -848,27 +946,27 @@ const resultTitleClass = computed(() =>
         </button>
         <button
           type="button"
-          class="mb-3 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/20"
+          class="w-full h-8 rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white transition-colors hover:bg-white/20"
           @click="handleBack"
         >
           {{ m.label_back() }}
         </button>
 
-        <div class="mb-3">
+        <div>
           <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-white/75">
             {{ m.label_blur() }}
           </div>
           <input v-model.number="blurLevel" class="w-full" type="range" min="0" max="40" step="1" />
         </div>
 
-        <div class="mb-3">
+        <div>
           <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-white/75">
             {{ m.label_export_ratio() }}
           </div>
-          <div class="grid grid-cols-2 gap-1 rounded-lg bg-white/10 p-1">
+          <div class="h-8 grid grid-cols-2 rounded-lg bg-white/10 overflow-hidden">
             <button
               type="button"
-              class="rounded-md px-2 py-1 text-xs font-semibold text-white transition-colors"
+              class="rounded-lg px-2 py-1 text-xs font-semibold text-white transition-colors"
               :class="exportRatio === '3:4' ? 'bg-white/25' : 'hover:bg-white/15'"
               @click="exportRatio = '3:4'"
             >
@@ -876,7 +974,7 @@ const resultTitleClass = computed(() =>
             </button>
             <button
               type="button"
-              class="rounded-md px-2 py-1 text-xs font-semibold text-white transition-colors"
+              class="rounded-lg px-2 py-1 text-xs font-semibold text-white transition-colors"
               :class="exportRatio === '9:16' ? 'bg-white/25' : 'hover:bg-white/15'"
               @click="exportRatio = '9:16'"
             >
@@ -885,14 +983,14 @@ const resultTitleClass = computed(() =>
           </div>
         </div>
 
-        <div class="mb-3">
+        <div>
           <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-white/75">
             {{ m.label_frame_theme() }}
           </div>
-          <div class="grid grid-cols-2 gap-1 rounded-lg bg-white/10 p-1">
+          <div class="h-8 grid grid-cols-2 rounded-lg bg-white/10 overflow-hidden">
             <button
               type="button"
-              class="rounded-md px-2 py-1 text-xs font-semibold text-white transition-colors"
+              class="rounded-lg px-2 py-1 text-xs font-semibold text-white transition-colors"
               :class="frameTheme === 'dark' ? 'bg-white/25' : 'hover:bg-white/15'"
               @click="frameTheme = 'dark'"
             >
@@ -900,7 +998,7 @@ const resultTitleClass = computed(() =>
             </button>
             <button
               type="button"
-              class="rounded-md px-2 py-1 text-xs font-semibold text-white transition-colors"
+              class="rounded-lg px-2 py-1 text-xs font-semibold text-white transition-colors"
               :class="frameTheme === 'light' ? 'bg-white/25' : 'hover:bg-white/15'"
               @click="frameTheme = 'light'"
             >
@@ -909,21 +1007,21 @@ const resultTitleClass = computed(() =>
           </div>
         </div>
 
-        <div>
-          <div class="mb-3">
+        <div class="flex flex-col gap-3">
+          <div>
             <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-white/75">
               {{ m.label_accent_color() }}
             </div>
             <div class="flex items-center gap-2">
               <input
-                class="h-9 w-14 cursor-pointer rounded-md border border-white/25 bg-transparent p-1"
+                class="h-8 w-14 cursor-pointer rounded-lg border border-white/25 bg-transparent p-1"
                 type="color"
                 :value="resolvedAccentColor"
                 @input="updateAccentColor"
               />
               <button
                 type="button"
-                class="flex-1 rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+                class="flex-1 h-8 rounded-lg border border-white/20 bg-white/10 px-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
                 @click="resetAccentColor"
               >
                 {{ m.label_reset_default() }}
@@ -931,40 +1029,37 @@ const resultTitleClass = computed(() =>
             </div>
           </div>
 
-          <div class="mb-3">
-            <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-white/75">{{ m.label_credit() }}</div>
-            <input
-              v-model="creditName"
-              class="w-full rounded-md border border-white/20 bg-black/35 px-2 py-1.5 text-xs text-white outline-none focus:border-white/35"
-              type="text"
-              maxlength="36"
-              placeholder="@your_name"
-            />
+          <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-white/75">
+            {{ m.label_text_align() }}
+          </div>
+          <div class="h-8 grid grid-cols-3 rounded-lg bg-white/10 overflow-hidden">
+            <button
+              type="button"
+              class="rounded-lg px-2 py-1 text-xs font-semibold text-white transition-colors"
+              :class="titleAlign === 'left' ? 'bg-white/25' : 'hover:bg-white/15'"
+              @click="titleAlign = 'left'"
+            >
+              {{ m.label_align_left() }}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg px-2 py-1 text-xs font-semibold text-white transition-colors"
+              :class="titleAlign === 'center' ? 'bg-white/25' : 'hover:bg-white/15'"
+              @click="titleAlign = 'center'"
+            >
+              {{ m.label_align_center() }}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg px-2 py-1 text-xs font-semibold text-white transition-colors"
+              :class="titleAlign === 'right' ? 'bg-white/25' : 'hover:bg-white/15'"
+              @click="titleAlign = 'right'"
+            >
+              {{ m.label_align_right() }}
+            </button>
           </div>
 
-          <div class="mb-3">
-            <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-white/75">{{ m.label_avatar() }}</div>
-            <div class="flex items-center gap-2">
-              <input
-                ref="avatarFileInputRef"
-                class="block w-[80%] text-xs text-white file:mr-2 file:rounded-md file:border-0 file:bg-white/15 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-white hover:file:bg-white/20"
-                type="file"
-                accept="image/*"
-                @change="handleAvatarUpload"
-              />
-              <button
-                type="button"
-                class="flex-1 rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-white/20 disabled:opacity-50"
-                :disabled="!avatarUrl"
-                @click="clearAvatar"
-              >
-                {{ m.label_clear() }}
-              </button>
-            </div>
-            <p v-if="avatarUrl" class="mt-1 text-[11px] font-medium text-white/55">{{ m.label_avatar_cached() }}</p>
-          </div>
-
-          <div class="mb-3">
+          <div>
             <label
               class="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wider text-white/75"
             >
@@ -977,40 +1072,45 @@ const resultTitleClass = computed(() =>
             </label>
           </div>
 
-          <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-white/75">
-            {{ m.label_text_align() }}
+          <div v-show="showCredit">
+            <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-white/75">{{ m.label_credit() }}</div>
+            <input
+              v-model="creditName"
+              class="w-full h-8 rounded-lg border border-white/20 bg-black/35 px-2 text-xs text-white outline-none focus:border-white/35"
+              type="text"
+              maxlength="36"
+              placeholder="@your_name"
+            />
           </div>
-          <div class="grid grid-cols-3 gap-1 rounded-lg bg-white/10 p-1">
-            <button
-              type="button"
-              class="rounded-md px-2 py-1 text-xs font-semibold text-white transition-colors"
-              :class="titleAlign === 'left' ? 'bg-white/25' : 'hover:bg-white/15'"
-              @click="titleAlign = 'left'"
-            >
-              {{ m.label_align_left() }}
-            </button>
-            <button
-              type="button"
-              class="rounded-md px-2 py-1 text-xs font-semibold text-white transition-colors"
-              :class="titleAlign === 'center' ? 'bg-white/25' : 'hover:bg-white/15'"
-              @click="titleAlign = 'center'"
-            >
-              {{ m.label_align_center() }}
-            </button>
-            <button
-              type="button"
-              class="rounded-md px-2 py-1 text-xs font-semibold text-white transition-colors"
-              :class="titleAlign === 'right' ? 'bg-white/25' : 'hover:bg-white/15'"
-              @click="titleAlign = 'right'"
-            >
-              {{ m.label_align_right() }}
-            </button>
+
+          <div v-show="showCredit">
+            <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-white/75">{{ m.label_avatar() }}</div>
+            <div class="flex items-center gap-2">
+              <input
+                v-show="!avatarUrl"
+                ref="avatarFileInputRef"
+                class="block w-[80%] text-xs text-white file:mr-2 file:rounded-md file:border-0 file:bg-white/15 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-white hover:file:bg-white/20"
+                type="file"
+                accept="image/*"
+                @change="handleAvatarUpload"
+              />
+              <img v-show="avatarUrl" class="w-8 h-8 rounded-full object-cover" :src="avatarUrl" />
+              <button
+                type="button"
+                class="flex-1 h-8 rounded-lg border border-white/20 bg-white/10 px-2 text-xs font-semibold text-white transition-colors hover:bg-white/20 disabled:opacity-50"
+                :disabled="!avatarUrl"
+                @click="clearAvatar"
+              >
+                {{ m.label_clear() }}
+              </button>
+            </div>
+            <!-- <p v-if="avatarUrl" class="mt-1 text-[11px] font-medium text-white/55">{{ m.label_avatar_cached() }}</p> -->
           </div>
         </div>
 
         <button
           type="button"
-          class="mt-3 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+          class="w-full h-8 rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="exporting"
           @click="generateAndDownloadImage"
         >
@@ -1023,7 +1123,11 @@ const resultTitleClass = computed(() =>
     <div
       ref="phoneFrameRef"
       class="relative z-[1] w-[min(430px,100%)] aspect-[9/19.5] overflow-hidden rounded-[36px] shadow-[0_30px_80px_rgb(0_0_0_/_70%)] max-md:w-[min(420px,100%-1rem)] max-md:rounded-[28px] select-none"
-      :class="exportRenderMode ? 'bg-black' : 'bg-transparent'"
+      :class="
+        exportRenderMode
+          ? 'bg-black shadow-[0_12px_36px_rgb(0_0_0_/_45%)]'
+          : 'bg-transparent'
+      "
     >
       <div
         v-if="viewState === 'input'"
@@ -1042,7 +1146,7 @@ const resultTitleClass = computed(() =>
           <div class="mb-2 flex items-center justify-between gap-1">
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+              class="h-6 inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2 text-xs font-semibold text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               :aria-label="m.github_button_aria_label()"
               @click="openGithubRepo"
             >
@@ -1059,7 +1163,7 @@ const resultTitleClass = computed(() =>
               </svg>
               {{ m.github_button_label() }}
             </button>
-            <div class="grid grid-cols-2 gap-1 rounded-lg bg-white/10 p-1">
+            <div class="grid grid-cols-2 rounded-lg bg-white/10">
               <button
                 type="button"
                 class="rounded-lg px-2 py-1 text-xs font-semibold text-white transition-colors"
@@ -1145,7 +1249,10 @@ const resultTitleClass = computed(() =>
         v-else-if="albumData"
         ref="resultScreenRef"
         class="relative h-full w-full overflow-x-hidden overflow-y-auto font-body [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        :class="resultScreenThemeClass"
+        :class="[
+          resultScreenThemeClass,
+          exportRenderMode ? '[&_*]:transition-none' : '',
+        ]"
       >
         <div v-if="!exportRenderMode" class="absolute inset-0 z-0 pointer-events-none">
           <img
