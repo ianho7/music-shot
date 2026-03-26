@@ -1343,7 +1343,7 @@ const resultTitleClass = computed(() =>
                     ></div>
                   </div>
                 </div>
-                <div class="flex-1">
+                <div class="w-[60%]">
                   <p class="font-semibold" :style="{ color: resolvedAccentColor }">
                     {{ track.name }}
                   </p>
