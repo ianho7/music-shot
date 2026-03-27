@@ -3,6 +3,7 @@
  */
 import { m } from './paraglide/messages'
 import type { AppleMusicWebSchema, SpotifyEmbedResponse } from './types'
+import type { AlbumHeaderSection, AppleMusicSerializedServerData } from './types/appleMusic'
 
 export interface Track {
   name: string
@@ -142,20 +143,31 @@ export class MusicLinkParser {
 
     // 2. 提取 ld+json 脚本内容
     const regex = /<script id=schema:music-album[^>]*>([\s\S]*?)<\/script>/
+    const serverDataRegex = /<script[^>]*id=["']serialized-server-data["'][^>]*>([\s\S]*?)<\/script>/
+    
     const match = html.match(regex)
     if (!match) throw new Error(m.error_parse_failed())
-
     const schemaRaw = match[1]
     if (!schemaRaw) throw new Error(m.error_parse_failed())
 
+    const serverDataMatch = html.match(serverDataRegex)
+    if (!serverDataMatch) throw new Error(m.error_parse_failed())
+    const serverDataRaw = serverDataMatch[1]
+    if (!serverDataRaw) throw new Error(m.error_parse_failed())
+
     let data: AppleMusicWebSchema
+    let serverData: AppleMusicSerializedServerData
     try {
       data = JSON.parse(schemaRaw)
+      serverData = JSON.parse(serverDataRaw)
     } catch (error) {
-      throw new Error('Apple schema JSON parse failed', { cause: error })
+      throw new Error('Apple schema JSON or server data JSON parse failed', { cause: error })
     }
 
     // 3. 映射到统一的 AlbumData 格式
+    const trackSection = serverData.data[0]?.data.sections.find((item) => item.itemKind === 'trackLockup')
+    const artistList = trackSection && trackSection.items.map((item) => (item.subtitleLinks || []).map((s) => s.title || '').join(', ')) || []
+
     return {
       title: data.name,
       artist: data.byArtist[0] ? data.byArtist[0].name : '',
@@ -166,7 +178,8 @@ export class MusicLinkParser {
       genre: data.genre ? data.genre[0] : 'Unknown',
       tracks: data.tracks.map((t, i) => ({
         name: t.name,
-        artist: data.byArtist[0] ? data.byArtist[0].name : '',
+        // artist: data.byArtist[0] ? data.byArtist[0].name : '',
+        artist:artistList[i] || '',
         // Apple 网页版时长格式是 ISO 8601 (例如 "PT2M58S")
         duration_s: this.parseISO8601Duration(t.duration),
         track_number: i + 1,

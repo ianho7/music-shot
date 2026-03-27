@@ -51,6 +51,7 @@ export function useAlbumParser() {
       const { cleanedUrl } = detectAndValidateAlbumUrl(inputUrl.value)
       loading.value = true
       const result = await parser.parse(cleanedUrl)
+      console.log(result)
       albumData.value = result
       viewState.value = 'result'
       onSuccess?.()

@@ -88,10 +88,10 @@ onBeforeUnmount(() => {
 
     <main
       ref="contentRef"
-      class="relative z-10 mx-auto max-w-lg px-6 py-12 max-md:px-4 max-md:pb-24 max-md:pt-8"
+      class="relative z-10 mx-auto max-w-lg px-5 py-10 max-md:px-4 max-md:pb-24 max-md:pt-8"
     >
       <section class="flex flex-col items-center mb-6">
-        <div class="relative group mb-6 w-full px-6 max-md:mb-4 max-md:px-3">
+        <div class="relative group mb-5 w-full px-5 max-md:mb-4 max-md:px-3">
           <img
             class="relative z-10 h-auto w-full rounded-lg object-cover shadow-[0_10px_24px_rgba(0,0,0,0.45)]"
             :src="props.coverUrl"
@@ -188,7 +188,7 @@ onBeforeUnmount(() => {
         >
           <div
             v-if="index === 0"
-            class="group flex items-center gap-5 p-4 rounded-xl bg-white/5 transition-colors max-md:gap-3 max-md:p-3"
+            class="w-full group flex items-center gap-5 p-4 rounded-xl bg-white/5 transition-colors max-md:gap-3 max-md:p-3"
           >
             <div class="w-6 text-center">
               <div class="flex items-end justify-center gap-0.5 h-4">
@@ -206,14 +206,14 @@ onBeforeUnmount(() => {
                 ></div>
               </div>
             </div>
-            <div class="w-[60%]">
-              <p class="font-semibold" :style="{ color: props.resolvedAccentColor }">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap" :style="{ color: props.resolvedAccentColor }">
                 {{ track.name }}
               </p>
               <p :class="props.trackArtistClass">{{ track.artist }}</p>
             </div>
-            <div class="flex items-center gap-4">
-              <span
+            <div class="flex items-center gap-4 ml-auto">
+              <!-- <span
                 class="material-symbols-outlined text-lg [font-variation-settings:'FILL'_1,'wght'_400,'GRAD'_0,'opsz'_24]"
                 :style="{ color: props.resolvedAccentColor }"
               >
@@ -227,7 +227,7 @@ onBeforeUnmount(() => {
                     d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z"
                   />
                 </svg>
-              </span>
+              </span> -->
               <span
                 class="text-sm font-medium tabular-nums"
                 :style="{ color: props.resolvedAccentColor }"
@@ -238,7 +238,7 @@ onBeforeUnmount(() => {
 
           <div
             v-else
-            class="group flex items-center gap-5 p-4 rounded-xl hover:bg-white/5 transition-colors max-md:gap-3 max-md:p-3"
+            class="w-full group flex items-center gap-5 p-4 rounded-xl hover:bg-white/5 transition-colors max-md:gap-3 max-md:p-3"
           >
             <span
               class="w-6 text-center text-sm font-medium text-on-surface-variant/80 tabular-nums group-hover:hidden"
@@ -265,12 +265,12 @@ onBeforeUnmount(() => {
                 />
               </svg>
             </span>
-            <div class="w-[60%]">
+            <div class="flex-1 min-w-0">
               <p :class="props.trackTitleClass">{{ track.name }}</p>
               <p :class="props.trackArtistClass">{{ track.artist }}</p>
             </div>
-            <div class="flex items-center gap-4">
-              <span :class="props.trackHeartMutedClass">favorite</span>
+            <div class="flex items-center gap-4 ml-auto">
+              <!-- <span :class="props.trackHeartMutedClass">favorite</span> -->
               <span :class="props.trackDurationMutedClass">{{
                 props.formatDuration(track.duration_s)
               }}</span>

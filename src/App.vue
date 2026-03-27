@@ -140,13 +140,13 @@ const trackHeartMutedClass = computed(() =>
 )
 const trackTitleClass = computed(() =>
   frameTheme.value === 'light'
-    ? 'font-semibold text-black overflow-hidden text-ellipsis whitespace-nowrap'
-    : 'font-semibold text-white overflow-hidden text-ellipsis whitespace-nowrap',
+    ? 'text-sm font-semibold text-black overflow-hidden text-ellipsis whitespace-nowrap'
+    : 'text-sm font-semibold text-white overflow-hidden text-ellipsis whitespace-nowrap',
 )
 const resultTitleClass = computed(() =>
   frameTheme.value === 'light'
-    ? 'font-headline text-4xl font-extrabold tracking-tighter text-black leading-tight max-md:text-3xl'
-    : 'font-headline text-4xl font-extrabold tracking-tighter text-white leading-tight max-md:text-3xl',
+    ? 'font-headline text-3xl font-extrabold tracking-tighter text-black leading-tight max-md:text-3xl'
+    : 'font-headline text-3xl font-extrabold tracking-tighter text-white leading-tight max-md:text-3xl',
 )
 </script>
 
