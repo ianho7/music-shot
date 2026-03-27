@@ -38,3 +38,8 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Claude
+.claude
+.agents
+skills-lock.json

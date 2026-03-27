@@ -2,6 +2,7 @@
  * 统一的音乐数据接口
  */
 import { m } from './paraglide/messages'
+import type { AppleMusicWebSchema, SpotifyEmbedResponse } from './types'
 
 export interface Track {
   name: string
@@ -31,7 +32,7 @@ export class MusicLinkParser {
     if (url.includes('spotify.com')) {
       return this.parseSpotify(url)
     } else if (url.includes('apple.com')) {
-      return this.parseAppleMusic(url)
+      return this.parseAppleMusicWeb(url)
     } else {
       throw new Error(m.error_unsupported_platform())
     }
@@ -56,81 +57,44 @@ export class MusicLinkParser {
     const rawResponse = await response.text()
     const html = this.extractHtmlFromProxyResponse(rawResponse)
 
-    try {
-      // 新版 Spotify Embed: Next.js 注入在 __NEXT_DATA__ 中
-      const nextDataMatch = html.match(
-        /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/,
+    // 新版 Spotify Embed: Next.js 注入在 __NEXT_DATA__ 中
+    const nextDataMatch = html.match(
+      /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/,
+    )
+    if (nextDataMatch) {
+      const nextDataRaw = nextDataMatch[1]
+      if (!nextDataRaw) {
+        throw new Error(m.error_parse_failed())
+      }
+      const nextData: SpotifyEmbedResponse = JSON.parse(nextDataRaw)
+      const entity = nextData?.props?.pageProps?.state?.data?.entity
+      if (!entity) {
+        throw new Error(m.error_parse_failed())
+      }
+
+      const images = Array.isArray(entity.visualIdentity?.image) ? entity.visualIdentity.image : []
+      const bestImage = images.reduce(
+        (best, current) => ((current?.maxWidth ?? 0) > (best?.maxWidth ?? 0) ? current : best),
+        images[0],
       )
-      if (nextDataMatch) {
-        const nextDataRaw = nextDataMatch[1]
-        if (!nextDataRaw) {
-          throw new Error(m.error_parse_failed())
-        }
-        const nextData = JSON.parse(nextDataRaw)
-        const entity = nextData?.props?.pageProps?.state?.data?.entity
-        if (!entity) {
-          throw new Error(m.error_parse_failed())
-        }
-
-        const images = Array.isArray(entity.visualIdentity?.image)
-          ? entity.visualIdentity.image
-          : []
-        const bestImage = images.reduce(
-          (best: any, current: any) =>
-            (current?.maxWidth ?? 0) > (best?.maxWidth ?? 0) ? current : best,
-          images[0],
-        )
-        const tracks = Array.isArray(entity.trackList) ? entity.trackList : []
-
-        return {
-          title: entity.title || entity.name || '',
-          artist: entity.subtitle || '',
-          cover_url: bestImage?.url || '',
-          release_date: entity.releaseDate?.isoString || '',
-          platform: 'Spotify',
-          tracks: tracks.map((t: any, i: number) => ({
-            name: t.title || '',
-            artist: t.subtitle || entity.subtitle || '',
-            duration_s: Math.floor((t.duration ?? 0) / 1000),
-            track_number: i + 1,
-          })),
-        }
-      }
-
-      // 老版 Spotify Embed 兜底: initial-state base64
-      const initialStateMatch = html.match(
-        /<script id="initial-state" type="text\/plain">([^<]+)<\/script>/,
-      )
-      if (!initialStateMatch) {
-        throw new Error(m.error_parse_failed())
-      }
-
-      const initialState = initialStateMatch[1]
-      if (!initialState) {
-        throw new Error(m.error_parse_failed())
-      }
-      const decodedData = JSON.parse(atob(initialState))
-      const albumEntity = decodedData.entities.items[`spotify:album:${albumId}`]
-      if (!albumEntity) {
-        throw new Error(m.error_parse_failed())
-      }
+      const tracks = Array.isArray(entity.trackList) ? entity.trackList : []
 
       return {
-        title: albumEntity.name,
-        artist: albumEntity.artists[0].name,
-        cover_url: albumEntity.images[0].url,
-        release_date: albumEntity.release_date,
+        title: entity.title || entity.name || '',
+        artist: entity.subtitle || '',
+        cover_url: bestImage?.url || '',
+        release_date: entity.releaseDate?.isoString || '',
         platform: 'Spotify',
-        tracks: albumEntity.tracks.items.map((t: any, i: number) => ({
-          name: t.name,
-          artist: t.artists.map((a: any) => a.name).join(', '),
-          duration_s: Math.floor(t.duration_ms / 1000),
+        tracks: tracks.map((t, i) => ({
+          name: t.title || '',
+          artist: t.subtitle || entity.subtitle || '',
+          duration_s: Math.floor((t.duration ?? 0) / 1000),
           track_number: i + 1,
         })),
       }
-    } catch (e) {
-      throw new Error(`${m.error_parse_failed()}: ${(e as Error).message}`)
     }
+
+    throw new Error(m.error_parse_failed())
   }
 
   /**
@@ -166,57 +130,58 @@ export class MusicLinkParser {
   }
 
   /**
-   * --- Apple Music 正道逻辑 ---
-   * 原理：使用 iTunes Lookup API，这是官方预留的公开跨域接口
+   * Apple Music 网页解析逻辑 (不通过 iTunes API)
    */
-  private async parseAppleMusic(url: string): Promise<AlbumData> {
-    const match = url.match(/\/album\/.*\/(\d+)/)
-    if (!match) throw new Error(m.error_invalid_apple_url())
-
-    const albumId = match[1]
-    // // 直接请求，无需代理（iTunes API 支持 CORS）
-    // const res = await fetch(`https://itunes.apple.com/lookup?id=${albumId}&entity=song`)
-    // const data = await res.json()
-    // const results = Array.isArray(data?.results) ? data.results : []
-    // if (results.length === 0) {
-    //   throw new Error(m.error_parse_failed())
-    // }
-
-    const embedUrl = `https://itunes.apple.com/lookup?id=${albumId}&entity=song`
-
-    // 通过代理获取 json
-    const response = await fetch(`${this.PROXY}${encodeURIComponent(embedUrl)}`)
+  private async parseAppleMusicWeb(url: string): Promise<AlbumData> {
+    // 1. 通过代理获取网页 HTML
+    // 注意：Apple Music 必须过代理，否则浏览器会拦截请求
+    const response = await fetch(`${this.PROXY}${encodeURIComponent(url)}`)
     if (!response.ok) throw new Error(m.error_parse_failed())
+    const proxyRaw = await response.text()
+    const html = this.extractHtmlFromProxyResponse(proxyRaw)
 
-    const data = await response.json()
-    const results = Array.isArray(data?.results) ? data.results : []
-    if (results.length === 0) {
-      throw new Error(m.error_parse_failed())
+    // 2. 提取 ld+json 脚本内容
+    const regex = /<script id=schema:music-album[^>]*>([\s\S]*?)<\/script>/
+    const match = html.match(regex)
+    if (!match) throw new Error(m.error_parse_failed())
+
+    const schemaRaw = match[1]
+    if (!schemaRaw) throw new Error(m.error_parse_failed())
+
+    let data: AppleMusicWebSchema
+    try {
+      data = JSON.parse(schemaRaw)
+    } catch (error) {
+      throw new Error('Apple schema JSON parse failed', { cause: error })
     }
 
-    const albumInfo =
-      results.find(
-        (item: any) => item?.wrapperType === 'collection' && item?.collectionType === 'Album',
-      ) ?? results[0]
-    const trackList = results.filter(
-      (item: any) => item?.wrapperType === 'track' && item?.kind === 'song',
-    )
-    const artworkUrl100 = albumInfo?.artworkUrl100 ?? ''
-    const coverUrl = artworkUrl100 ? artworkUrl100.replace('100x100bb', '1000x1000bb') : ''
-
+    // 3. 映射到统一的 AlbumData 格式
     return {
-      title: albumInfo?.collectionName ?? '',
-      artist: albumInfo?.artistName ?? '',
-      genre: albumInfo?.primaryGenreName ?? '',
-      cover_url: coverUrl,
-      release_date: albumInfo?.releaseDate ?? '',
+      title: data.name,
+      artist: data.byArtist[0] ? data.byArtist[0].name : '',
+      cover_url: data.image.replace('{w}x{h}bb', '1000x1000bb'), // 替换尺寸占位符
+      release_date: data.datePublished,
       platform: 'AppleMusic',
-      tracks: trackList.map((t: any) => ({
-        name: t?.trackName ?? '',
-        artist: t?.artistName ?? albumInfo?.artistName ?? '',
-        duration_s: Math.floor((t?.trackTimeMillis ?? 0) / 1000),
-        track_number: t?.trackNumber ?? 0,
+      // 邪修福利：Apple 网页版直接带了 Genre
+      genre: data.genre ? data.genre[0] : 'Unknown',
+      tracks: data.tracks.map((t, i) => ({
+        name: t.name,
+        artist: data.byArtist[0] ? data.byArtist[0].name : '',
+        // Apple 网页版时长格式是 ISO 8601 (例如 "PT2M58S")
+        duration_s: this.parseISO8601Duration(t.duration),
+        track_number: i + 1,
       })),
     }
+  }
+
+  /**
+   * 辅助方法：将 ISO 8601 时长（如 PT3M45S）转换为秒
+   */
+  private parseISO8601Duration(duration: string): number {
+    const match = duration.match(/PT(\d+M)?(\d+S)?/)
+    if (!match) return 0
+    const minutes = parseInt(match[1] || '0', 10) || 0
+    const seconds = parseInt(match[2] || '0', 10) || 0
+    return minutes * 60 + seconds
   }
 }

@@ -9,4 +9,3 @@ declare module '*paraglide/runtime' {
     options?: { reload?: boolean },
   ): void | Promise<void>
 }
-
