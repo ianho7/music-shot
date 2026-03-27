@@ -33,9 +33,20 @@ Music Shot is intended for quickly turning album links into reusable visual asse
 
 ### Export Results
 
-| Happier Than Ever | Hurry Up Tomorrow | The Life of a Showgirl | DeBI TiRAR MaS FOToS |
-| --- | --- | --- | --- |
-| ![Happier Than Ever export](./docs/images/result-screen-Happier%20Than%20Ever_3x4.png) | ![Hurry Up Tomorrow export](./docs/images/result-screen-Hurry%20Up%20Tomorrow_3x4.png) | ![The Life of a Showgirl export](./docs/images/result-screen-The%20Life%20of%20a%20Showgirl_3x4.png) | ![DeBI TiRAR MaS FOToS export](./docs/images/result-screen-DeB%C3%8D%20TiRAR%20M%C3%A1S%20FOToS_3x4.png) |
+<table>
+  <tr>
+    <th align="center">Happier Than Ever</th>
+    <th align="center">Hurry Up Tomorrow</th>
+    <th align="center">The Life of a Showgirl</th>
+    <th align="center">DeBI TiRAR MaS FOToS</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="./docs/images/result-screen-Happier%20Than%20Ever_3x4.png" alt="Happier Than Ever export" width="220"></td>
+    <td align="center"><img src="./docs/images/result-screen-Hurry%20Up%20Tomorrow_3x4.png" alt="Hurry Up Tomorrow export" width="220"></td>
+    <td align="center"><img src="./docs/images/result-screen-The%20Life%20of%20a%20Showgirl_3x4.png" alt="The Life of a Showgirl export" width="220"></td>
+    <td align="center"><img src="./docs/images/result-screen-DeB%C3%8D%20TiRAR%20M%C3%A1S%20FOToS_3x4.png" alt="DeBI TiRAR MaS FOToS export" width="220"></td>
+  </tr>
+</table>
 
 ## Usage
 
