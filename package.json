@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
+    "build": "bun run type-check && bun run build-only",
     "preview": "vite preview",
     "build-only": "vite build",
     "i18n:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide",
-    "type-check": "vue-tsc --build",
+    "type-check": "bun run i18n:compile && vue-tsc --build",
     "lint": "run-s lint:*",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@zumer/snapdom": "^2.6.0",
-    "vue": "beta"
+    "vue": "3.5.31"
   },
   "devDependencies": {
     "@inlang/paraglide-js": "^2.15.1",
@@ -40,7 +40,7 @@
     "postcss": "^8.5.8",
     "tailwindcss": "3.4.17",
     "typescript": "~5.9.3",
-    "vite": "beta",
+    "vite": "8.0.3",
     "vite-plugin-vue-devtools": "^8.0.7",
     "vue-tsc": "^3.2.5"
   },
@@ -48,18 +48,16 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "overrides": {
-    "vue": "beta",
-    "@vue/compiler-core": "beta",
-    "@vue/compiler-dom": "beta",
-    "@vue/compiler-sfc": "beta",
-    "@vue/compiler-ssr": "beta",
-    "@vue/compiler-vapor": "beta",
-    "@vue/reactivity": "beta",
-    "@vue/runtime-core": "beta",
-    "@vue/runtime-dom": "beta",
-    "@vue/runtime-vapor": "beta",
-    "@vue/server-renderer": "beta",
-    "@vue/shared": "beta",
-    "@vue/compat": "beta"
+    "vue": "3.5.31",
+    "@vue/compiler-core": "3.5.31",
+    "@vue/compiler-dom": "3.5.31",
+    "@vue/compiler-sfc": "3.5.31",
+    "@vue/compiler-ssr": "3.5.31",
+    "@vue/reactivity": "3.5.31",
+    "@vue/runtime-core": "3.5.31",
+    "@vue/runtime-dom": "3.5.31",
+    "@vue/server-renderer": "3.5.31",
+    "@vue/shared": "3.5.31",
+    "@vue/compat": "3.5.31"
   }
 }
