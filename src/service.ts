@@ -179,7 +179,7 @@ export class MusicLinkParser {
       tracks: data.tracks.map((t, i) => ({
         name: t.name,
         // artist: data.byArtist[0] ? data.byArtist[0].name : '',
-        artist:artistList[i] || '',
+        artist:artistList[i] || (data.byArtist[0] ? data.byArtist[0].name : ''),
         // Apple 网页版时长格式是 ISO 8601 (例如 "PT2M58S")
         duration_s: this.parseISO8601Duration(t.duration),
         track_number: i + 1,
