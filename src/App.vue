@@ -152,7 +152,7 @@ const resultTitleClass = computed(() =>
 
 <template>
   <div
-    class="relative grid w-full min-h-dvh place-items-center overflow-x-hidden"
+    class="relative grid h-dvh w-full place-items-center overflow-hidden"
     :class="
       viewState === 'input'
         ? 'bg-black'

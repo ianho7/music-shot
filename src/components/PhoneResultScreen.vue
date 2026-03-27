@@ -33,8 +33,9 @@ const overlayStyle = computed(() => {
 
 function syncOverlayHeight() {
   const root = rootRef.value
+  const content = contentRef.value
   if (!root) return
-  const contentHeight = Math.ceil(root.scrollHeight)
+  const contentHeight = Math.ceil(content?.scrollHeight ?? 0)
   const viewportHeight = Math.ceil(root.clientHeight)
   overlayHeightPx.value = Math.max(contentHeight, viewportHeight)
 }
