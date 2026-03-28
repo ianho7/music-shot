@@ -3,6 +3,7 @@ import { m } from '../paraglide/messages'
 import type { ExportRatio, FrameTheme, TextAlignMode } from '../composables/useAppSettings'
 import type { VNodeRef } from 'vue'
 import GithubRepoButton from './GithubRepoButton.vue'
+import ParticleBurst from './ParticleBurst.vue'
 
 const props = defineProps<{
   locale: 'en' | 'zh'
@@ -277,17 +278,18 @@ function onShowCreditChange(event: Event) {
         </p>
       </div>
     </div>
-
-    <button
-      type="button"
-      class="w-full h-8 rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
-      :disabled="props.exporting"
-      data-testid="export-image-desktop"
-      data-ai-action="export-image"
-      @click="props.generateAndDownloadImage"
-    >
-      {{ props.exporting ? m.label_generating() : m.label_generate_download() }}
-    </button>
+    <ParticleBurst>
+      <button
+        type="button"
+        class="w-full h-8 rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+        :disabled="props.exporting"
+        data-testid="export-image-desktop"
+        data-ai-action="export-image"
+        @click="props.generateAndDownloadImage"
+      >
+        {{ props.exporting ? m.label_generating() : m.label_generate_download() }}
+      </button>
+    </ParticleBurst>
     <p v-if="props.exportError" class="mt-2 text-xs text-red-300">{{ props.exportError }}</p>
   </div>
 </template>

@@ -207,7 +207,10 @@ onBeforeUnmount(() => {
               </div>
             </div>
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap" :style="{ color: props.resolvedAccentColor }">
+              <p
+                class="text-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap"
+                :style="{ color: props.resolvedAccentColor }"
+              >
                 {{ track.name }}
               </p>
               <p :class="props.trackArtistClass">{{ track.artist }}</p>
